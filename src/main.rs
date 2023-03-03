@@ -68,7 +68,8 @@ async fn main() {
             Err(e) => {
                 println!("sorry, something went wrong: {}. Retrying...", e);
                 if ctx.chat_context.latest().role == "user" {
-                    ctx.chat_context.pop_latest()
+                    ctx.chat_context.pop_latest();
+                    continue;
                 }
             }
         }
