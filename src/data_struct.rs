@@ -1,3 +1,4 @@
+use core::fmt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -96,3 +97,26 @@ impl ChatGPTAPIContext {
         self.chat_context.clear();
     }
 }
+
+#[derive(Debug)]
+pub enum APIError {
+    NetworkError(String),
+    ParseError(String),
+}
+
+impl From<reqwest::Error> for APIError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::NetworkError(e.to_string())
+    }
+}
+
+impl fmt::Display for APIError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::NetworkError(t) => write!(f, "network error: {}", t),
+            Self::ParseError(t) => write!(f, "parse response error: {}", t),
+        }
+    }
+}
+
+impl std::error::Error for APIError {}
