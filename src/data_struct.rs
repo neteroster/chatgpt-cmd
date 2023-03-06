@@ -1,5 +1,14 @@
 use core::fmt;
+use reqwest::{
+    self,
+    header::{self, HeaderMap},
+};
 use serde::{Deserialize, Serialize};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
@@ -36,7 +45,7 @@ pub struct ChatUsage {
     pub total_tokens: usize,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ChatContext {
     pub messages: Vec<Message>,
 }
@@ -75,6 +84,7 @@ impl ChatContext {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ChatGPTAPIContext {
     pub api_key: String,
     pub api_url: String,
@@ -95,6 +105,59 @@ impl ChatGPTAPIContext {
 
     pub fn reset(&mut self) {
         self.chat_context.clear();
+    }
+
+    pub fn serialize_to_file<P>(&self, p: P) -> Result<(), std::io::Error>
+    where
+        P: Into<PathBuf>,
+    {
+        let mut f = File::create(p.into())?;
+        let serialized = serde_json::to_string(&self)?;
+        f.write_all(serialized.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn from_file(p: &Path) -> Result<Self, std::io::Error> {
+        let f = File::open(p)?;
+
+        Ok(serde_json::from_reader(f)?)
+    }
+
+    pub async fn send_to_gpt(&mut self) -> Result<(), APIError> {
+        let payload = RequestPayload {
+            model: "gpt-3.5-turbo".to_owned(),
+            messages: &self.chat_context.messages,
+        };
+
+        let client = reqwest::Client::new();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Bearer {}", self.api_key).parse().unwrap(),
+        );
+
+        let response = client
+            .post(&self.api_url)
+            .headers(headers)
+            .json(&payload)
+            .send()
+            .await?;
+
+        let completion: ChatCompletion = response.json().await?;
+        let resp = completion
+            .choices
+            .into_iter()
+            .next()
+            .ok_or(APIError::ParseError(
+                "error decoding response: encounts None.".to_owned(),
+            ))?
+            .message;
+
+        self.chat_context.add_message(resp);
+
+        Ok(())
     }
 }
 
