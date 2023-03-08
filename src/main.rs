@@ -1,3 +1,4 @@
+use tgchatgpt::cmdline::*;
 use tgchatgpt::data_struct::*;
 
 const CHATGPT_API_URL: &'static str = "https://api.openai.com/v1/chat/completions";
@@ -16,18 +17,20 @@ async fn main() {
     loop {
         println!("You: ");
         let line = std::io::stdin().lines().next().unwrap().unwrap();
-        if line == "quit" {
-            break;
+        let cmdopr = CmdOperationType::try_from(TryFromWrapper(line.clone() /* del */)).unwrap();
+        match cmdopr {
+            CmdOperationType::QuitCmd => break,
+            CmdOperationType::ClearContext => {
+                ctx.reset();
+                continue;
+            }
+            CmdOperationType::SaveContext(p) => {
+                ctx.serialize_to_file(p).unwrap();
+                continue;
+            }
+            _ => (),
         }
-        if line == "clear" {
-            ctx.reset();
-            continue;
-        }
-        if line.starts_with("save") {
-            let fpath = line.split(' ').into_iter().skip(1).next().unwrap();
-            ctx.serialize_to_file(fpath).unwrap();
-            continue;
-        }
+
         ctx.chat_context.add_user_chat(line);
 
         match ctx.send_to_gpt().await {
