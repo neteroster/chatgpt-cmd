@@ -17,21 +17,23 @@ async fn main() {
     loop {
         println!("You: ");
         let line = std::io::stdin().lines().next().unwrap().unwrap();
-        let cmdopr = CmdOperationType::try_from(TryFromWrapper(line.clone() /* del */)).unwrap();
-        match cmdopr {
-            CmdOperationType::QuitCmd => break,
-            CmdOperationType::ClearContext => {
+        let cmd = CmdLine::try_from(TryFromWrapper(line.clone() /* del */)).unwrap();
+        match cmd {
+            CmdLine::Operation(CmdOperation::QuitCmd) => break,
+            CmdLine::Operation(CmdOperation::ClearContext) => {
                 ctx.reset();
                 continue;
             }
-            CmdOperationType::SaveContext(p) => {
-                ctx.serialize_to_file(p).unwrap();
+            CmdLine::Operation(CmdOperation::SaveContext(pth)) => {
+                ctx.serialize_to_file(pth).unwrap();
                 continue;
             }
-            _ => (),
+            CmdLine::Operation(CmdOperation::ReadContext(pth)) => {
+                ctx = ChatGPTAPIContext::from_file(pth).unwrap();
+                continue;
+            }
+            CmdLine::Chat(c) => ctx.chat_context.add_user_chat(c),
         }
-
-        ctx.chat_context.add_user_chat(line);
 
         match ctx.send_to_gpt().await {
             Ok(_) => (),
