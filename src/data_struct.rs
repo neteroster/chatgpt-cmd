@@ -4,11 +4,9 @@ use reqwest::{
     header::{self, HeaderMap},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{fs::File, io::Write, path::Path};
+
+use crate::cmdline::CmdChat;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
@@ -69,10 +67,7 @@ impl ChatContext {
         self.messages.clear();
     }
 
-    pub fn add_user_chat<S>(&mut self, txt: S)
-    where
-        S: Into<String>,
-    {
+    pub fn add_user_chat(&mut self, txt: CmdChat) {
         self.messages.push(Message {
             role: "user".to_owned(),
             content: txt.into(),
@@ -109,16 +104,19 @@ impl ChatGPTAPIContext {
 
     pub fn serialize_to_file<P>(&self, p: P) -> Result<(), std::io::Error>
     where
-        P: Into<PathBuf>,
+        P: AsRef<Path>,
     {
-        let mut f = File::create(p.into())?;
+        let mut f = File::create(p.as_ref())?;
         let serialized = serde_json::to_string(&self)?;
         f.write_all(serialized.as_bytes())?;
         Ok(())
     }
 
-    pub fn from_file(p: &Path) -> Result<Self, std::io::Error> {
-        let f = File::open(p)?;
+    pub fn from_file<P>(p: P) -> Result<Self, std::io::Error>
+    where
+        P: AsRef<Path>,
+    {
+        let f = File::open(p.as_ref())?;
 
         Ok(serde_json::from_reader(f)?)
     }
